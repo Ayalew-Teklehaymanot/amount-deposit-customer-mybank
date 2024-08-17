@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:snowflake="http://www.mulesoft.org/schema/mule/snowflake" xmlns:email="http://www.mulesoft.org/schema/mule/email" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd
+http://www.mulesoft.org/schema/mule/snowflake http://www.mulesoft.org/schema/mule/snowflake/current/mule-snowflake.xsd">
+    <http:listener-config name="mybankdepositamount-httpListenerConfig">
+        <http:listener-connection host="0.0.0.0" port="8081" />
+    </http:listener-config>
+    <apikit:config name="mybankdepositamount-config" api="resource::c711f3ad-7c9a-48fa-8816-7396a84bfc28:mybankdepositamount:1.0.0:raml:zip:mybankdepositamount.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
+    <configuration-properties doc:name="Configuration properties" doc:id="c0603bbb-9060-416b-aa4d-1feabe5f1c9f" file="config.yaml" />
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="f6c06df3-e113-4c7f-a817-cf9df3a06fc9" >
+		<db:my-sql-connection host="${db.host}" port="${db.port}" user="${db.user}" password="${db.password}" database="${db.database}" />
+	</db:config>
+	<email:smtp-config name="Email_SMTP" doc:name="Email SMTP" doc:id="1f91f871-fa90-4e3c-bd6c-e3c2ac74a87b" >
+		<email:smtp-connection host="${email.config.host}" port="${email.config.port}" user="${email.config.user}" password="${email.config.password}" >
+			<email:properties >
+				<email:property key="mail.smtp.starttls.enable" value="true" />
+				<email:property key="mail.smtp.ssl.trust" value="*" />
+			</email:properties>
+		</email:smtp-connection>
+	</email:smtp-config>
+	<flow name="mybankdepositamount-main">
+        <http:listener config-ref="mybankdepositamount-httpListenerConfig" path="/api/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:router config-ref="mybankdepositamount-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:BAD_REQUEST">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Bad request"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Method not allowed"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">405</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not acceptable"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">406</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Unsupported media type"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">415</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not Implemented"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">501</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="mybankdepositamount-console">
+        <http:listener config-ref="mybankdepositamount-httpListenerConfig" path="/console/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:console config-ref="mybankdepositamount-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="mybank-deposit-amount-EMAIL-Flow" doc:id="1093d237-cb9a-4428-894d-d144c72cd1e7" >
+		<ee:transform doc:name="Transform Message" doc:id="cc9e5bbe-470a-4d10-a41f-8e40e83a1d37" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[output application/json
+---
+
+	"Your Account is Credited " ++ vars.inPayload.depositAmount as Number ++ ".Your Balance Today is- " ++ vars.TotalAmt as Number
+
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Before email is sent" doc:id="2c0755e0-58b3-45e7-96c3-107c1b8e177e" />
+		<email:send doc:name="Send Email " doc:id="8fe6448e-9796-49f7-ad91-a6226c3766a7" config-ref="Email_SMTP" fromAddress="ayal.tek@gmail.com" subject='#["Amount Deposited Successfully For"++ vars.inPayload.bank]'>
+			<email:to-addresses >
+				<email:to-address value="#[vars.email]" />
+			</email:to-addresses>
+			<email:body contentType="text/plain" >
+			</email:body>
+		</email:send>
+		<logger level="INFO" doc:name="After email is sent" doc:id="62c583ed-4eba-45eb-8410-d13faa0e21a8" />
+	</flow>
+	<flow name="put:\deposit:application\json:mybankdepositamount-config">
+        <logger level="INFO" doc:name="API START" doc:id="8ec00a0e-3b95-44c6-975e-9e12ce583363" message="-------- API Started---------"/>
+		<set-variable value="#[payload.depositAmount as Number]" doc:name="depositAmt" doc:id="639b3d07-df67-40de-b4ab-3edfbd7ee62e" variableName="inputPayload"/>
+		<set-variable value="#[payload]" doc:name="inputPayload" doc:id="e255652c-4c99-4d9d-96da-18261a4aa7aa" variableName="inPayload "/>
+		<db:select doc:name="Select" doc:id="da659345-1c80-4669-b87e-dd55ee40cdeb" config-ref="Database_Config">
+			<db:sql ><![CDATA[select * from branch where custAccNum=:custAccNum and bankName=:bankName]]></db:sql>
+			<db:input-parameters ><![CDATA[#[output application/json
+---
+{
+	"bankName": payload.bank,
+	"custAccNum": payload.accountNum
+}]]]></db:input-parameters>
+		</db:select>
+		<set-variable value="#[payload.mailId[0] as String]" doc:name="Email" doc:id="dc865c57-4e9d-4948-8209-4e05e920ecbd" variableName="email"/>
+		<choice doc:name="Choice" doc:id="c5c331db-bfdf-4f08-af68-245dfdf882dc" >
+			<when expression="#[sizeOf(payload)&gt;=1]">
+				<logger level="INFO" doc:name="RECORD FOUND" doc:id="20fb9638-be74-4d03-a60d-e87edeb1326d" />
+				<set-variable doc:name="TotalAmt" doc:id="054dc527-a11d-40ed-8c7d-4002e610aa52" variableName="TotalAmt" value="#[output application/json&#10;---&#10;&#10;vars.inputPayload[0]+payload.totalBalance[0] as Number]" />
+				<db:update doc:name="Update" doc:id="b9ab710a-48a8-47c5-b5e9-6775fa9ec684" config-ref="Database_Config">
+					<db:sql ><![CDATA[UPDATE branch 
+SET totalBalance = :TotalBalance
+WHERE custAccNum=:custAccNum and bankName=:bankName ]]></db:sql>
+					<db:input-parameters ><![CDATA[#[output application/json
+---
+
+{
+	 "TotalBalance": payload.totalBalance[0] + vars.inputPayload,
+     "custAccNum":payload.custAccNum[0],
+     "bankName": payload.bankName[0]
+}]]]></db:input-parameters>
+				</db:update>
+				<flow-ref doc:name="Flow Reference" doc:id="d396f5fd-26e0-4d9a-be44-e73e286c332c" name="mybank-deposit-amount-EMAIL-Flow"/>
+				<ee:transform doc:name="MESSAGE- RECORD UPDATED" doc:id="9c07fd42-325d-4988-b247-6c5ef120e943" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  "status": "Amount deposit successfully done for the Account Number :- " ++ 
+  vars.inPayload.accountNum
+  
+  
+  }]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="RECORD NOT FOUND" doc:id="c57a93fd-f9f7-45f4-b901-1c2191e586f2" />
+				<ee:transform doc:name="MESSAGE- RECORD NOT FOUND" doc:id="a10f45d1-4cbf-46ff-8c08-0ed93161f259" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[output application/json
+---
+{
+  "status": "Account with Account Number :- " ++ 
+  vars.inPayload.accountNum ++ "  "++"doesn't exist"
+  
+  
+  }]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+    </flow>
+</mule>
