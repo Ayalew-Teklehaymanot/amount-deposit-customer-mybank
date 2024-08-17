@@ -1,0 +1,24 @@
+email:
+  config:
+    port: "587"
+    host: "smtp.gmail.com"
+    user: "ayal.aboze@gmail.com"
+    password: "sakflebkevvhlfgn"
+http:
+  host: "localhost"
+  port: "8081"    
+db:
+  port: "3306"
+  host: "localhost"
+  user: "root" 
+  password: "Harar1350" 
+  database: "mulerealtime"
+dbs:
+  sfc:
+    accountname: "dza72997.east-us-2.azure"
+    warehouse: "compute_wh"
+    database: "ADABANK"
+    schema: "BFS"
+    user: "Ayalew"
+    password: "Harar1350"
+    role: "accountadmin" 
